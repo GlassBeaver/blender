@@ -129,6 +129,14 @@ class Texture {
   /* Return true on success. */
   bool init_1D(int w, int layers, int mip_len, eGPUTextureFormat format);
   bool init_2D(int w, int h, int layers, int mip_len, eGPUTextureFormat format);
+  bool init_2D_glasslink(int w,
+                         int h,
+                         int layers,
+                         int mip_len,
+                         eGPUTextureFormat format,
+                         void *dx12_shared_handle,
+                         size_t dx12_shared_size,
+                         void *dx12_shared_fence_handle);
   bool init_3D(int w, int h, int d, int mip_len, eGPUTextureFormat format);
   bool init_cubemap(int w, int layers, int mip_len, eGPUTextureFormat format);
   bool init_buffer(VertBuf *vbo, eGPUTextureFormat format);
@@ -141,6 +149,8 @@ class Texture {
                  int layer_len,
                  bool cube_as_array,
                  bool use_stencil);
+
+  virtual void WaitOnGlassLinkSemaphore() = 0;
 
   virtual void generate_mipmap() = 0;
   virtual void copy_to(Texture *tex) = 0;
@@ -317,6 +327,9 @@ class Texture {
                              int mip_offset,
                              int layer_offset,
                              bool use_stencil) = 0;
+  virtual bool init_internal(void *dx12_shared_handle,
+                             size_t dx12_shared_size,
+                             void *dx12_shared_fence_handle) = 0;
 };
 
 /* Syntactic sugar. */

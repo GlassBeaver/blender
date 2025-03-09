@@ -14,7 +14,21 @@
 
 #include "overlay_next_base.hh"
 
+#include "BLI_subprocess.hh"
+
+#include "GPU_texture.hh"
+#include "gpu_texture_private.hh"
+
 namespace blender::draw::overlay {
+
+struct CGlassLinkShared final
+{
+  void *SharedTexHandles[3];
+  void *SharedFenceHandle{nullptr};
+  size_t SharedTexSize{0};
+  int Width{0};
+  int Height{0};
+};
 
 /**
  * Draw background color .
@@ -25,9 +39,42 @@ class Background : Overlay {
 
   GPUFrameBuffer *framebuffer_ref_ = nullptr;
 
+  GPUTexture *GlassLinkTexs[3]{nullptr, nullptr, nullptr};
+  CGlassLinkShared GlassLinkShared;
+
+  void InitGlassLinkTex()
+  {
+    SharedMemory sharedMem("Global\\GlassLinkShared", sizeof(GlassLinkShared), false);
+    void *pSharedData = sharedMem.get_data();
+    if (!pSharedData)
+      return;
+
+    GlassLinkShared = *reinterpret_cast<CGlassLinkShared *>(pSharedData);
+
+    if (!GlassLinkShared.SharedTexHandles[0] || GlassLinkShared.SharedTexSize == 0)
+      return;
+
+    for (int i = 0; i < 3; i++) {
+      //std::string name = "glassLinkTex" + std::to_string(i);
+      GlassLinkTexs[i] = GPU_texture_create_2d("glassLinkTex",
+                                               GlassLinkShared.Width,
+                                               GlassLinkShared.Height,
+                                               1,
+                                               GPU_R11F_G11F_B10F,
+                                               GPU_TEXTURE_USAGE_SHADER_READ,
+                                               NULL,
+                                               GlassLinkShared.SharedTexHandles[i],
+                                               GlassLinkShared.SharedTexSize,
+                                               GlassLinkShared.SharedFenceHandle);
+    }
+  }
+
  public:
   void begin_sync(Resources &res, const State &state) final
   {
+    if (!GlassLinkTexs[0])
+      InitGlassLinkTex();
+
     DRWState pass_state = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_BACKGROUND;
     float4 color_override(0.0f, 0.0f, 0.0f, 0.0f);
     int background_type;
@@ -70,13 +117,18 @@ class Background : Overlay {
           break;
         default:
         case TH_BACKGROUND_SINGLE_COLOR:
-          background_type = BG_SOLID;
+          background_type = BG_GLASSLINK;
+          //background_type = BG_SOLID;
           break;
       }
     }
 
     bg_ps_.init();
     bg_ps_.framebuffer_set(&framebuffer_ref_);
+
+    static int iGlassLinkTex = 0; // a guess since I'm not transporting the fence value over from Horu and opengl has no way of querying the last signaled value from the DX12 fence
+    if (GlassLinkTexs[iGlassLinkTex])
+      reinterpret_cast<blender::gpu::Texture *>(GlassLinkTexs[iGlassLinkTex])->WaitOnGlassLinkSemaphore();
 
     if ((state.clipping_plane_count != 0) && (state.rv3d) && (state.rv3d->clipbb)) {
       Span<float3> bbox(reinterpret_cast<float3 *>(state.rv3d->clipbb->vec[0]), 8);
@@ -94,9 +146,16 @@ class Background : Overlay {
     bg_ps_.bind_ubo(DRW_CLIPPING_UBO_SLOT, &res.clip_planes_buf);
     bg_ps_.bind_texture("colorBuffer", &res.color_render_tx);
     bg_ps_.bind_texture("depthBuffer", &res.depth_tx);
+
+    if (GlassLinkTexs[iGlassLinkTex])
+      bg_ps_.bind_texture("glassLink", &GlassLinkTexs[iGlassLinkTex]);
+
     bg_ps_.push_constant("colorOverride", color_override);
     bg_ps_.push_constant("bgType", background_type);
     bg_ps_.draw_procedural(GPU_PRIM_TRIS, 1, 3);
+
+    iGlassLinkTex++;
+    iGlassLinkTex = iGlassLinkTex % 3;
   }
 
   void draw_output(Framebuffer &framebuffer, Manager &manager, View &view) final

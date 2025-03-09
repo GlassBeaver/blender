@@ -81,6 +81,13 @@ void main()
     case BG_MASK:
       fragColor = vec4(vec3(1.0 - alpha), 0.0);
       return;
+    case BG_GLASSLINK: {
+      vec4 glassLinkColor = texture(glassLink, vec2(uvcoordsvar.x, 1.f - uvcoordsvar.y));
+      glassLinkColor.rgb = pow(glassLinkColor.rgb, vec3(2.2));
+      glassLinkColor.a = 1.f;
+      fragColor = glassLinkColor;
+      return;
+    }
   }
 
   bg_col = mix(bg_col, colorOverride.rgb, colorOverride.a);

@@ -51,6 +51,73 @@ GLTexture::~GLTexture()
   GLContext::tex_free(tex_id_);
 }
 
+bool GLTexture::init_internal(void *dx12_shared_handle,
+                              size_t dx12_shared_size,
+                              void *dx12_shared_fence_handle)
+{
+  if ((format_ == GPU_DEPTH24_STENCIL8) && GPU_depth_blitting_workaround()) {
+    /* MacOS + Radeon Pro fails to blit depth on GPU_DEPTH24_STENCIL8
+     * but works on GPU_DEPTH32F_STENCIL8. */
+    format_ = GPU_DEPTH32F_STENCIL8;
+  }
+
+  target_ = to_gl_target(type_);
+
+  /* We need to bind once to define the texture type. */
+  GLContext::state_manager_active_get()->texture_bind_temp(this);
+
+  if (!this->proxy_check(0)) {
+    return false;
+  }
+
+  GLenum internal_format = to_gl_internal_format(format_);
+  const bool is_cubemap = (type_ == GPU_TEXTURE_CUBE);
+  const int dimensions = (is_cubemap) ? 2 : this->dimensions_count();
+
+  GLuint memory_object;
+  glCreateMemoryObjectsEXT(1, &memory_object);
+  glImportMemoryWin32HandleEXT(
+      memory_object, dx12_shared_size, GL_HANDLE_TYPE_D3D11_IMAGE_EXT, dx12_shared_handle);
+
+  glGenSemaphoresEXT(1, &GlassLinkSemaphore);
+  glImportSemaphoreWin32HandleEXT(
+      GlassLinkSemaphore,
+      GL_HANDLE_TYPE_D3D12_FENCE_EXT /*GL_HANDLE_TYPE_OPAQUE_WIN32_EXT*/,
+      dx12_shared_fence_handle);
+
+  switch (dimensions) {
+    default:
+    case 1:
+      glTexStorageMem1DEXT(target_, mipmaps_, internal_format, w_, memory_object, 0);
+      break;
+    case 2:
+      glTexStorageMem2DEXT(target_, mipmaps_, internal_format, w_, h_, memory_object, 0);
+      break;
+    case 3:
+      glTexStorageMem3DEXT(target_, mipmaps_, internal_format, w_, h_, d_, memory_object, 0);
+      break;
+  }
+
+  this->mip_range_set(0, mipmaps_ - 1);
+
+  /* Avoid issues with formats not supporting filtering. Nearest by default. */
+  if (GLContext::direct_state_access_support) {
+    glTextureParameteri(tex_id_, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  }
+  else {
+    glTexParameteri(target_, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  }
+
+  debug::object_label(GL_TEXTURE, tex_id_, name_);
+  return true;
+}
+
+void GLTexture::WaitOnGlassLinkSemaphore()
+{
+  static const GLenum srcLayout = GL_LAYOUT_SHADER_READ_ONLY_EXT;
+  glWaitSemaphoreEXT(GlassLinkSemaphore, 0, nullptr, 1, &tex_id_, &srcLayout);
+}
+
 bool GLTexture::init_internal()
 {
   if ((format_ == GPU_DEPTH24_STENCIL8) && GPU_depth_blitting_workaround()) {

@@ -40,6 +40,8 @@ class GLTexture : public Texture {
    */
   static GLuint custom_samplers_state_cache_[GPU_SAMPLER_CUSTOM_TYPES_COUNT];
 
+  GLuint GlassLinkSemaphore = 0;
+
   /** Target to bind the texture to (#GL_TEXTURE_1D, #GL_TEXTURE_2D, etc...). */
   GLenum target_ = -1;
   /** opengl identifier for texture. */
@@ -57,6 +59,8 @@ class GLTexture : public Texture {
  public:
   GLTexture(const char *name);
   ~GLTexture();
+
+  void WaitOnGlassLinkSemaphore() override;
 
   void update_sub(
       int mip, int offset[3], int extent[3], eGPUDataFormat type, const void *data) override;
@@ -116,6 +120,10 @@ class GLTexture : public Texture {
   bool init_internal(VertBuf *vbo) override;
   /** Return true on success. */
   bool init_internal(GPUTexture *src, int mip_offset, int layer_offset, bool use_stencil) override;
+  /** Return true on success. */
+  bool init_internal(void *dx12_shared_handle,
+                     size_t dx12_shared_size,
+                     void *dx12_shared_fence_handle) override;
 
  private:
   bool proxy_check(int mip);

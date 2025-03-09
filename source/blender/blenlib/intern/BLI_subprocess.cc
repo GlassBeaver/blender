@@ -171,12 +171,11 @@ SharedMemory::SharedMemory(std::string name, size_t size, bool is_owner)
     CHECK(handle_ /*Create*/);
   }
   else {
-    handle_ = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
-    CHECK(handle_ /*Open*/);
+    handle_ = OpenFileMappingA(FILE_MAP_READ, FALSE, name.c_str());
   }
 
   if (handle_) {
-    data_ = MapViewOfFile(handle_, FILE_MAP_ALL_ACCESS, 0, 0, size);
+    data_ = MapViewOfFile(handle_, FILE_MAP_READ, 0, 0, size);
     CHECK(data_);
   }
   else {

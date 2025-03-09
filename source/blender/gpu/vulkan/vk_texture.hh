@@ -83,6 +83,8 @@ class VKTexture : public Texture {
 
   void init(VkImage vk_image, VkImageLayout layout, eGPUTextureFormat texture_format);
 
+  void WaitOnGlassLinkSemaphore() {}
+
   void generate_mipmap() override;
   void copy_to(Texture *tex) override;
   void copy_to(VKTexture &dst_texture, VkImageAspectFlags vk_image_aspect);
@@ -144,6 +146,13 @@ class VKTexture : public Texture {
   bool init_internal() override;
   bool init_internal(VertBuf *vbo) override;
   bool init_internal(GPUTexture *src, int mip_offset, int layer_offset, bool use_stencil) override;
+
+  bool init_internal(void * /*dx12_shared_handle*/,
+                     size_t /*dx12_shared_size*/,
+                     void * /*dx12_shared_fence_handle*/) override
+  {
+    return false;
+  }
 
  private:
   /** Is this texture a view of another texture. */

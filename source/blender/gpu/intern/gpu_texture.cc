@@ -86,6 +86,29 @@ bool Texture::init_2D(int w, int h, int layers, int mip_len, eGPUTextureFormat f
   return this->init_internal();
 }
 
+bool Texture::init_2D_glasslink(int w,
+                                int h,
+                                int layers,
+                                int mip_len,
+                                eGPUTextureFormat format,
+                                void *dx12_shared_handle,
+                                size_t dx12_shared_size,
+                                void *dx12_shared_fence_handle)
+{
+  w_ = w;
+  h_ = h;
+  d_ = layers;
+  int mip_len_max = 1 + floorf(log2f(max_ii(w, h)));
+  mipmaps_ = min_ii(mip_len, mip_len_max);
+  format_ = format;
+  format_flag_ = to_format_flag(format);
+  type_ = (layers > 0) ? GPU_TEXTURE_2D_ARRAY : GPU_TEXTURE_2D;
+  if ((format_flag_ & (GPU_FORMAT_DEPTH_STENCIL | GPU_FORMAT_INTEGER)) == 0) {
+    sampler_state.filtering = GPU_SAMPLER_FILTERING_LINEAR;
+  }
+  return this->init_internal(dx12_shared_handle, dx12_shared_size, dx12_shared_fence_handle);
+}
+
 bool Texture::init_3D(int w, int h, int d, int mip_len, eGPUTextureFormat format)
 {
   w_ = w;
@@ -262,7 +285,10 @@ static inline GPUTexture *gpu_texture_create(const char *name,
                                              eGPUTextureFormat tex_format,
                                              eGPUTextureUsage usage,
                                              const void *pixels,
-                                             eGPUDataFormat data_format = GPU_DATA_FLOAT)
+                                             eGPUDataFormat data_format = GPU_DATA_FLOAT,
+                                             void *dx12_shared_handle = nullptr,
+                                             size_t dx12_shared_size = 0,
+                                             void *dx12_shared_fence_handle = nullptr)
 {
   BLI_assert(mip_len > 0);
   Texture *tex = GPUBackend::get()->texture_alloc(name);
@@ -276,7 +302,17 @@ static inline GPUTexture *gpu_texture_create(const char *name,
       break;
     case GPU_TEXTURE_2D:
     case GPU_TEXTURE_2D_ARRAY:
-      success = tex->init_2D(w, h, d, mip_len, tex_format);
+      if (dx12_shared_handle && dx12_shared_size != 0)
+        success = tex->init_2D_glasslink(w,
+                                         h,
+                                         d,
+                                         mip_len,
+                                         tex_format,
+                                         dx12_shared_handle,
+                                         dx12_shared_size,
+                                         dx12_shared_fence_handle);
+      else
+        success = tex->init_2D(w, h, d, mip_len, tex_format);
       break;
     case GPU_TEXTURE_3D:
       success = tex->init_3D(w, h, d, mip_len, tex_format);
@@ -329,7 +365,34 @@ GPUTexture *GPU_texture_create_2d(const char *name,
                                   eGPUTextureUsage usage,
                                   const float *data)
 {
-  return gpu_texture_create(name, width, height, 0, GPU_TEXTURE_2D, mip_len, format, usage, data);
+  return gpu_texture_create(
+      name, width, height, 0, GPU_TEXTURE_2D, mip_len, format, usage, data, GPU_DATA_FLOAT);
+}
+
+GPUTexture *GPU_texture_create_2d(const char *name,
+                                  int width,
+                                  int height,
+                                  int mip_len,
+                                  eGPUTextureFormat format,
+                                  eGPUTextureUsage usage,
+                                  const float *data,
+                                  void *dx12_shared_handle,
+                                  size_t dx12_shared_size,
+                                  void *dx12_shared_fence_handle)
+{
+  return gpu_texture_create(name,
+                            width,
+                            height,
+                            0,
+                            GPU_TEXTURE_2D,
+                            mip_len,
+                            format,
+                            usage,
+                            data,
+                            GPU_DATA_FLOAT,
+                            dx12_shared_handle,
+                            dx12_shared_size,
+                            dx12_shared_fence_handle);
 }
 
 GPUTexture *GPU_texture_create_2d_array(const char *name,

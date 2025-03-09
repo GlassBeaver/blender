@@ -376,7 +376,7 @@ static void rna_ActionSlot_identifier_update(Main *bmain, Scene *, PointerRNA *p
   action.slot_identifier_propagate(*bmain, slot);
 }
 
-#  ifndef NDEBUG
+//#  ifndef NDEBUG
 static void rna_ActionSlot_debug_log_users(const ID *action_id, ActionSlot *dna_slot, Main *bmain)
 {
   using namespace blender::animrig;
@@ -397,7 +397,7 @@ static void rna_ActionSlot_debug_log_users(const ID *action_id, ActionSlot *dna_
     printf("  - %s\n", user->name);
   }
 }
-#  endif /* NDEBUG */
+//#  endif /* NDEBUG */
 
 static std::optional<std::string> rna_ActionLayer_path(const PointerRNA *ptr)
 {

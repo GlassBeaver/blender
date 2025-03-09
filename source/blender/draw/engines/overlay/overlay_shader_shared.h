@@ -19,6 +19,7 @@
 #define BG_RADIAL 3
 #define BG_SOLID_CHECKER 4
 #define BG_MASK 5
+#define BG_GLASSLINK 6
 
 enum OVERLAY_GridBits {
   SHOW_AXIS_X = (1u << 0u),
