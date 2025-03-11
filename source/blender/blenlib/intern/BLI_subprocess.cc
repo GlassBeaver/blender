@@ -163,15 +163,22 @@ bool BlenderSubprocess::is_running()
 }
 
 SharedMemory::SharedMemory(std::string name, size_t size, bool is_owner)
-    : name_(name), is_owner_(is_owner)
+    : name_(name), handle_(0), data_(nullptr), data_size_(0), is_owner_(is_owner)
 {
-  if (is_owner) {
+  Init(size);
+}
+
+void SharedMemory::Init(size_t size)
+{
+  Release();
+
+  if (is_owner_) {
     handle_ = CreateFileMappingA(
-        INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, size, name.c_str());
+        INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, size, name_.c_str());
     CHECK(handle_ /*Create*/);
   }
   else {
-    handle_ = OpenFileMappingA(FILE_MAP_READ, FALSE, name.c_str());
+    handle_ = OpenFileMappingA(FILE_MAP_READ, FALSE, name_.c_str());
   }
 
   if (handle_) {
@@ -185,14 +192,22 @@ SharedMemory::SharedMemory(std::string name, size_t size, bool is_owner)
   data_size_ = data_ ? size : 0;
 }
 
-SharedMemory::~SharedMemory()
+void SharedMemory::Release()
 {
   if (data_) {
     CHECK(UnmapViewOfFile(data_));
+    data_ = nullptr;
+    data_size_ = 0;
   }
   if (handle_) {
     CHECK(CloseHandle(handle_));
+    handle_ = 0;
   }
+}
+
+SharedMemory::~SharedMemory()
+{
+  Release();
 }
 
 SharedSemaphore::SharedSemaphore(std::string name, bool is_owner)

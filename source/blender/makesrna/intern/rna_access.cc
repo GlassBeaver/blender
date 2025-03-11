@@ -774,6 +774,9 @@ bool RNA_struct_is_a(const StructRNA *type, const StructRNA *srna)
 
 PropertyRNA *RNA_struct_find_property(PointerRNA *ptr, const char *identifier)
 {
+  if (!identifier)
+    return nullptr;
+
   if (identifier[0] == '[' && identifier[1] == '"') {
     /* id prop lookup, not so common */
     PropertyRNA *r_prop = nullptr;

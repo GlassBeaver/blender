@@ -41,6 +41,9 @@ class GLTexture : public Texture {
   static GLuint custom_samplers_state_cache_[GPU_SAMPLER_CUSTOM_TYPES_COUNT];
 
   GLuint GlassLinkSemaphore = 0;
+  GLuint MemoryObject = 0;
+  void *DX12SharedHandle = nullptr;
+  void *DX12SharedFenceHandle = nullptr;
 
   /** Target to bind the texture to (#GL_TEXTURE_1D, #GL_TEXTURE_2D, etc...). */
   GLenum target_ = -1;

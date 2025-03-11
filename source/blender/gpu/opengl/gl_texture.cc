@@ -24,6 +24,9 @@
 
 #include "gl_texture.hh"
 
+#include <Windows.h>
+
+
 namespace blender::gpu {
 
 /* -------------------------------------------------------------------- */
@@ -49,12 +52,36 @@ GLTexture::~GLTexture()
     ctx->state_manager->image_unbind(this);
   }
   GLContext::tex_free(tex_id_);
+
+  if (GlassLinkSemaphore) {
+    glDeleteSemaphoresEXT(1, &GlassLinkSemaphore);
+    GlassLinkSemaphore = 0;
+  }
+  if (MemoryObject) {
+    glDeleteMemoryObjectsEXT(1, &MemoryObject);
+    MemoryObject = 0;
+  }
+
+  if (DX12SharedHandle) {
+    CloseHandle(DX12SharedHandle);
+    DX12SharedHandle = nullptr;
+  }
+
+  if (DX12SharedFenceHandle) {
+    DWORD handleInfo;
+    if (GetHandleInformation(DX12SharedFenceHandle, &handleInfo) != 0)
+      CloseHandle(DX12SharedFenceHandle);
+    DX12SharedFenceHandle = nullptr;
+  }
 }
 
 bool GLTexture::init_internal(void *dx12_shared_handle,
                               size_t dx12_shared_size,
                               void *dx12_shared_fence_handle)
 {
+  DX12SharedHandle = dx12_shared_handle;
+  DX12SharedFenceHandle = dx12_shared_fence_handle;
+
   if ((format_ == GPU_DEPTH24_STENCIL8) && GPU_depth_blitting_workaround()) {
     /* MacOS + Radeon Pro fails to blit depth on GPU_DEPTH24_STENCIL8
      * but works on GPU_DEPTH32F_STENCIL8. */
@@ -74,27 +101,24 @@ bool GLTexture::init_internal(void *dx12_shared_handle,
   const bool is_cubemap = (type_ == GPU_TEXTURE_CUBE);
   const int dimensions = (is_cubemap) ? 2 : this->dimensions_count();
 
-  GLuint memory_object;
-  glCreateMemoryObjectsEXT(1, &memory_object);
+  glCreateMemoryObjectsEXT(1, &MemoryObject);
   glImportMemoryWin32HandleEXT(
-      memory_object, dx12_shared_size, GL_HANDLE_TYPE_D3D11_IMAGE_EXT, dx12_shared_handle);
+      MemoryObject, dx12_shared_size, GL_HANDLE_TYPE_D3D11_IMAGE_EXT, DX12SharedHandle);
 
   glGenSemaphoresEXT(1, &GlassLinkSemaphore);
   glImportSemaphoreWin32HandleEXT(
-      GlassLinkSemaphore,
-      GL_HANDLE_TYPE_D3D12_FENCE_EXT /*GL_HANDLE_TYPE_OPAQUE_WIN32_EXT*/,
-      dx12_shared_fence_handle);
+      GlassLinkSemaphore, GL_HANDLE_TYPE_D3D12_FENCE_EXT, DX12SharedFenceHandle);
 
   switch (dimensions) {
     default:
     case 1:
-      glTexStorageMem1DEXT(target_, mipmaps_, internal_format, w_, memory_object, 0);
+      glTexStorageMem1DEXT(target_, mipmaps_, internal_format, w_, MemoryObject, 0);
       break;
     case 2:
-      glTexStorageMem2DEXT(target_, mipmaps_, internal_format, w_, h_, memory_object, 0);
+      glTexStorageMem2DEXT(target_, mipmaps_, internal_format, w_, h_, MemoryObject, 0);
       break;
     case 3:
-      glTexStorageMem3DEXT(target_, mipmaps_, internal_format, w_, h_, d_, memory_object, 0);
+      glTexStorageMem3DEXT(target_, mipmaps_, internal_format, w_, h_, d_, MemoryObject, 0);
       break;
   }
 

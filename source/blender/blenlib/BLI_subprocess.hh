@@ -98,6 +98,8 @@ class SharedMemory : NonCopyable {
    * run (Windows uses reference counting).
    */
   SharedMemory(std::string name, size_t size, bool is_owner);
+  void Init(size_t size);
+  void Release();
   ~SharedMemory();
 
   /**

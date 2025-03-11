@@ -21,9 +21,8 @@
 
 namespace blender::draw::overlay {
 
-struct CGlassLinkShared final
-{
-  void *SharedTexHandles[3];
+struct CGlassLinkShared final {
+  void *SharedTexHandles[3]{nullptr, nullptr, nullptr};
   void *SharedFenceHandle{nullptr};
   size_t SharedTexSize{0};
   int Width{0};
@@ -41,39 +40,68 @@ class Background : Overlay {
 
   GPUTexture *GlassLinkTexs[3]{nullptr, nullptr, nullptr};
   CGlassLinkShared GlassLinkShared;
-
-  void InitGlassLinkTex()
-  {
-    SharedMemory sharedMem("Global\\GlassLinkShared", sizeof(GlassLinkShared), false);
-    void *pSharedData = sharedMem.get_data();
-    if (!pSharedData)
-      return;
-
-    GlassLinkShared = *reinterpret_cast<CGlassLinkShared *>(pSharedData);
-
-    if (!GlassLinkShared.SharedTexHandles[0] || GlassLinkShared.SharedTexSize == 0)
-      return;
-
-    for (int i = 0; i < 3; i++) {
-      //std::string name = "glassLinkTex" + std::to_string(i);
-      GlassLinkTexs[i] = GPU_texture_create_2d("glassLinkTex",
-                                               GlassLinkShared.Width,
-                                               GlassLinkShared.Height,
-                                               1,
-                                               GPU_R11F_G11F_B10F,
-                                               GPU_TEXTURE_USAGE_SHADER_READ,
-                                               NULL,
-                                               GlassLinkShared.SharedTexHandles[i],
-                                               GlassLinkShared.SharedTexSize,
-                                               GlassLinkShared.SharedFenceHandle);
-    }
-  }
+  SharedMemory SharedMem = SharedMemory("Global\\GlassLinkShared", sizeof(GlassLinkShared), false);
 
  public:
   void begin_sync(Resources &res, const State &state) final
   {
-    if (!GlassLinkTexs[0])
-      InitGlassLinkTex();
+    // init GlassLink and check if there's a new set of textures because it got restarted
+    {
+      if (SharedMem.get_size() == 0)
+        SharedMem.Init(sizeof(GlassLinkShared));
+
+      void *pSharedData = SharedMem.get_data();
+      if (pSharedData) {
+        CGlassLinkShared newGlassLinkShared = *reinterpret_cast<CGlassLinkShared *>(pSharedData);
+        CGlassLinkShared oldGlassLinkShared = GlassLinkShared;
+
+        if (memcmp(&GlassLinkShared, &newGlassLinkShared, sizeof(GlassLinkShared)) != 0) {
+          GlassLinkShared = newGlassLinkShared;
+
+          if (GlassLinkShared.SharedTexHandles[0] && GlassLinkShared.SharedTexSize != 0) {
+            // TODO: remove
+            printf("creating glasslink textures from handles %p     %p     %p     %p\n",
+                   GlassLinkShared.SharedFenceHandle,
+                   GlassLinkShared.SharedTexHandles[0],
+                   GlassLinkShared.SharedTexHandles[1],
+                   GlassLinkShared.SharedTexHandles[2]);
+
+            for (int i = 0; i < 3; i++) {
+              if (GlassLinkTexs[i]) {
+                GPU_texture_free(GlassLinkTexs[i]);
+                GlassLinkTexs[i] = nullptr;
+              }
+
+              GlassLinkTexs[i] = GPU_texture_create_2d("glassLinkTex",
+                                                       GlassLinkShared.Width,
+                                                       GlassLinkShared.Height,
+                                                       1,
+                                                       GPU_R11F_G11F_B10F,
+                                                       GPU_TEXTURE_USAGE_SHADER_READ,
+                                                       NULL,
+                                                       GlassLinkShared.SharedTexHandles[i],
+                                                       GlassLinkShared.SharedTexSize,
+                                                       GlassLinkShared.SharedFenceHandle);
+            }
+          }
+          else {
+            // TODO: remove
+            printf("deleting glasslink textures %p     %p     %p\n",
+                   GlassLinkTexs[0],
+                   GlassLinkTexs[1],
+                   GlassLinkTexs[2]);
+
+            for (int i = 0; i < 3; i++)
+              if (GlassLinkTexs[i]) {
+                GPU_texture_free(GlassLinkTexs[i]);
+                GlassLinkTexs[i] = nullptr;
+              }
+
+            SharedMem.Release();
+          }
+        }
+      }
+    }
 
     DRWState pass_state = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_BACKGROUND;
     float4 color_override(0.0f, 0.0f, 0.0f, 0.0f);
@@ -117,8 +145,7 @@ class Background : Overlay {
           break;
         default:
         case TH_BACKGROUND_SINGLE_COLOR:
-          background_type = BG_GLASSLINK;
-          //background_type = BG_SOLID;
+          background_type = GlassLinkTexs[0] ? BG_GLASSLINK : BG_SOLID;
           break;
       }
     }
