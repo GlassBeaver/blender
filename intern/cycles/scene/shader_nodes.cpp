@@ -7575,6 +7575,7 @@ NODE_DEFINE(NormalMapNode)
 
   SOCKET_IN_FLOAT(strength, "Strength", 1.0f);
   SOCKET_IN_COLOR(color, "Color", make_float3(0.5f, 0.5f, 1.0f));
+  SOCKET_BOOLEAN(invert_green, "Invert Green", false);
 
   SOCKET_OUT_NORMAL(normal, "Normal");
 
@@ -7631,7 +7632,7 @@ void NormalMapNode::compile(SVMCompiler &compiler)
                                            compiler.stack_assign(normal_out),
                                            space),
                     attr,
-                    attr_sign);
+                    attr_sign | (invert_green ? 0x80000000 : 0));
 }
 
 void NormalMapNode::compile(OSLCompiler &compiler)
@@ -7651,6 +7652,7 @@ void NormalMapNode::compile(OSLCompiler &compiler)
   }
 
   compiler.parameter(this, "space");
+  compiler.parameter(this, "invert_green");
   compiler.add(this, "node_normal_map");
 }
 

@@ -5939,6 +5939,10 @@ static void def_sh_normal_map(BlenderRNA * /*brna*/, StructRNA *srna)
   RNA_def_property_ui_text(prop, "UV Map", "UV Map for tangent space maps");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
+  prop = RNA_def_property(srna, "invert_green", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, nullptr, "invert_green", 0);
+  RNA_def_property_ui_text(prop, "Invert Green", "Invert the green channel of the normal map");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
   RNA_def_struct_sdna_from(srna, "bNode", nullptr);
 }
 

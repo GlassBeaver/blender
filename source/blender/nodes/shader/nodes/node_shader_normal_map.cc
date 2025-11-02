@@ -35,6 +35,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 static void node_shader_buts_normal_map(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
   layout->prop(ptr, "space", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+  layout->prop(ptr, "invert_green", UI_ITEM_R_SPLIT_EMPTY_NAME, "Invert Green", ICON_NONE);
 
   if (RNA_enum_get(ptr, "space") == SHD_SPACE_TANGENT) {
     PointerRNA obptr = CTX_data_pointer_get(C, "active_object");
@@ -104,6 +105,11 @@ static int gpu_shader_normal_map(GPUMaterial *mat,
   }
 
   GPU_link(mat, color_to_normal_fnc_name, newnormal, &newnormal);
+
+  if (nm->invert_green) {
+    GPU_link(mat, "color_invert_green_channel", newnormal, &newnormal);
+  }
+
   switch (nm->space) {
     case SHD_SPACE_TANGENT:
       GPU_material_flag_set(mat, GPU_MATFLAG_OBJECT_INFO);

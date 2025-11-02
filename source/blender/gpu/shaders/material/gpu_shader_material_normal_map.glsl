@@ -32,6 +32,11 @@ void color_to_blender_normal_new_shading(float3 color, out float3 normal)
   normal = float3(2.0f, -2.0f, -2.0f) * color - float3(1.0f);
 }
 
+void color_invert_green_channel(float3 color, out float3 result)
+{
+  result = float3(color.x, -color.y, color.z);
+}
+
 void node_normal_map_mix(float strength, float3 newnormal, out float3 outnormal)
 {
   outnormal = normalize(mix(g_data.N, newnormal, max(0.0f, strength)));

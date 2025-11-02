@@ -1683,6 +1683,8 @@ typedef struct NodeShaderTangent {
 typedef struct NodeShaderNormalMap {
   int space;
   char uv_map[/*MAX_CUSTOMDATA_LAYER_NAME_NO_PREFIX*/ 64];
+  uint8_t invert_green;
+  char _pad[7];
 } NodeShaderNormalMap;
 
 typedef struct NodeRadialTiling {
